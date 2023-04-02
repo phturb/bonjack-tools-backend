@@ -8,20 +8,22 @@ import {
   VoiceState,
   Message,
 } from "discord.js";
-import { Server as HttpServer } from "http";
+import { Application, Request, Response } from "express";
 import { Server as WebSocketServer, WebSocket } from "ws";
-import { CHANNEL_ID, TIMER_TIME } from "./config/config";
+import Closeable from "./closeable";
+import { CHANNEL_ID, TIMER_TIME } from "../config/config";
+import ControllerConfigurator from "./controllerConfigurator";
 import DiscordManager from "./discordManager";
-import { getPlayerStats } from "./helpers/stats.helpers";
-import { broadcast, send } from "./helpers/ws.helpers";
-import { emptyPlayer, GameState } from "./interfaces/gameState.interface";
-import { Message as Msg } from "./interfaces/message.interface";
+import { getPlayerStats } from "../helpers/stats.helpers";
+import { broadcast, send } from "../helpers/ws.helpers";
+import Initializable from "./initializable";
+import { emptyPlayer, GameState } from "../interfaces/gameState.interface";
+import { Message as Msg } from "../interfaces/message.interface";
 
-class GameManager {
+class GameManager implements Closeable, ControllerConfigurator, Initializable {
   roles: string[];
   gameState: GameState;
   discordManager: DiscordManager;
-  httpServer: HttpServer;
   webSocketServer: WebSocketServer;
   prisma: PrismaClient;
   countDownId: NodeJS.Timer | undefined;
@@ -29,13 +31,11 @@ class GameManager {
 
   constructor(
     discordManager: DiscordManager,
-    httpServer: HttpServer,
     webSocketServer: WebSocketServer,
     prisma: PrismaClient
   ) {
     this.prisma = prisma;
     this.discordManager = discordManager;
-    this.httpServer = httpServer;
     this.webSocketServer = webSocketServer;
     this.gameState = {
       players: [
@@ -63,6 +63,26 @@ class GameManager {
     this.registerWebSocket();
     this.registerDiscord();
     await this.updatePlayerListFromDiscord();
+  }
+
+  configureController(app: Application): Application {
+    app.get("/players", async (req: Request, res: Response) => {
+        const players = await this.prisma.player.findMany();
+        res.json(players);
+    });
+    
+    app.get("/games", async (req: Request, res: Response) => {
+        const games = await this.prisma.game.findMany();
+        res.json(games);
+    });
+    
+    
+    app.get("/rolls", async (req: Request, res: Response) => {
+        const rolls = await this.prisma.roll.findMany();
+        res.json(rolls);
+    });
+
+    return app;
   }
 
   private registerWebSocket() {
@@ -503,6 +523,8 @@ class GameManager {
     }
     return players;
   }
+
+  close() {};
 }
 
 export default GameManager;

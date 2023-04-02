@@ -1,7 +1,9 @@
 import {Client as DiscordClient, VoiceChannel} from "discord.js";
-import {CHANNEL_ID, DISCORD_TOKEN} from "./config/config";
+import Closeable from "./closeable";
+import {CHANNEL_ID, DISCORD_TOKEN} from "../config/config";
+import Initializable from "./initializable";
 
-class DiscordManager {
+class DiscordManager implements Closeable, Initializable {
   discordClient: DiscordClient;
   private channel: VoiceChannel | null = null;
   private channelFetchState: "error" | "success" | "inProgress" = "inProgress";

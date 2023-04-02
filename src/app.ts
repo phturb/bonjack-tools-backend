@@ -5,17 +5,19 @@ import {
 } from "discord.js";
 import http from "http";
 import { Server as WebSocketServer } from "ws";
-import GameManager from "./gameManager";
+import GameManager from "./managers/gameManager";
 import { DISCORD_TOKEN, PORT } from "./config/config";
-import DiscordManager from "./discordManager";
+import DiscordManager from "./managers/discordManager";
 import { PrismaClient } from "@prisma/client";
-import configureExpressApplication from "./controllers/controllers";
+import configureExpressApplication from "./helpers/controllers.helpers";
+import ExpenseManager from "./managers/expenseManager";
 
 if (!DISCORD_TOKEN) {
   console.error("Discord Token not defined ! Please defined DISCORD_TOKEN");
   process.exit(1);
 }
 
+// Create singleton dependencies
 const prisma = new PrismaClient();
 const discordClient = new DiscordClient({
   intents: [Intents.FLAGS.GUILDS,
@@ -23,23 +25,30 @@ const discordClient = new DiscordClient({
             Intents.FLAGS.GUILD_MESSAGES,
             Intents.FLAGS.GUILD_MESSAGES],
 });
-const app: Application = express();
-configureExpressApplication(app, prisma);
+let app: Application = express();
+app = configureExpressApplication(app);
 const server = http.createServer(app);
 const wsServer = new WebSocketServer({ server: server });
 const discordManager = new DiscordManager(discordClient);
-const gameManager = new GameManager(discordManager, server, wsServer, prisma);
+const gameManager = new GameManager(discordManager, wsServer, prisma);
+const expenseManager = new ExpenseManager(prisma);
+
+// Configure controller
+app = gameManager.configureController(app);
+app = expenseManager.configureController(app);
+
 const init = async () => {
     await discordManager.init();
     await gameManager.init();
-
 }
 
 init().then(() => {
     server.listen(PORT, function () {
-        console.log(`Server is running on port ${PORT}`);
-      });
+      console.log(`Server is running on port ${PORT}`);
+    });
     server.on("close", () => {
       discordManager.close();
+      gameManager.close();
+      expenseManager.close();
     })
 });
