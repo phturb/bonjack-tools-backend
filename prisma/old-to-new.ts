@@ -3,14 +3,14 @@ import { PrismaClient as OldPrismaClient } from "./generated/olddb";
 
 const prisma = new PrismaClient();
 const oldPrisma = new OldPrismaClient();
-const ROLES = [ "ADC" , "MID" , "JUNGLE" , "SUPPORT" , "TOP" ];
+const ROLES = ["ADC", "MID", "JUNGLE", "SUPPORT", "TOP"];
 
 async function main() {
   for (const role of ROLES) {
     await prisma.role.upsert({
       where: { name: role },
       update: {},
-      create: { name: role }
+      create: { name: role },
     });
   }
 
@@ -22,55 +22,55 @@ async function main() {
     await prisma.player.upsert({
       where: { id: player.id },
       update: {
-        name: player.name
+        name: player.name,
       },
       create: {
         id: player.id,
-        name: player.name
-      }
+        name: player.name,
+      },
     });
   }
 
   for (const game of oldGames) {
     await prisma.game.create({
       data: {
-        id: game.id
-      }
+        id: game.id,
+      },
     });
   }
 
   for (const roll of oldRolls) {
-    const game = oldGames.find(x => x.id === roll.gameId);
+    const game = oldGames.find((x) => x.id === roll.gameId);
     const playerRoles = [];
     if (game) {
       if (game.player1Id) {
         playerRoles.push({
           playerId: game.player1Id,
-          roleName: roll.player1Roll as string
+          roleName: roll.player1Roll as string,
         });
       }
       if (game.player2Id) {
         playerRoles.push({
           playerId: game.player2Id,
-          roleName: roll.player2Roll as string
+          roleName: roll.player2Roll as string,
         });
       }
       if (game.player3Id) {
         playerRoles.push({
           playerId: game.player3Id,
-          roleName: roll.player3Roll as string
+          roleName: roll.player3Roll as string,
         });
       }
       if (game.player4Id) {
         playerRoles.push({
           playerId: game.player4Id,
-          roleName: roll.player4Roll as string
+          roleName: roll.player4Roll as string,
         });
       }
       if (game.player5Id) {
         playerRoles.push({
           playerId: game.player5Id,
-          roleName: roll.player5Roll as string
+          roleName: roll.player5Roll as string,
         });
       }
     }
@@ -79,19 +79,21 @@ async function main() {
         gameId: roll.gameId,
         rollNumber: roll.rollNumber,
         playerRoles: {
-          create: playerRoles
-        }
-      }
-    })
+          create: playerRoles,
+        },
+      },
+    });
   }
 }
 
-main().then(async () => {
-  await prisma.$disconnect();
-  await oldPrisma.$disconnect();
-}).catch(async (err) => {
-  console.error(err);
-  await prisma.$disconnect();
-  await oldPrisma.$disconnect();
-  process.exit(1);
-});
+main()
+  .then(async () => {
+    await prisma.$disconnect();
+    await oldPrisma.$disconnect();
+  })
+  .catch(async (err) => {
+    console.error(err);
+    await prisma.$disconnect();
+    await oldPrisma.$disconnect();
+    process.exit(1);
+  });

@@ -1,6 +1,6 @@
-import {Client as DiscordClient, VoiceChannel} from "discord.js";
+import { Client as DiscordClient, VoiceChannel } from "discord.js";
 import Closeable from "./closeable";
-import {CHANNEL_ID, DISCORD_TOKEN} from "../config/config";
+import { CHANNEL_ID, DISCORD_TOKEN } from "../config/config";
 import Initializable from "./initializable";
 
 class DiscordManager implements Closeable, Initializable {
@@ -15,35 +15,40 @@ class DiscordManager implements Closeable, Initializable {
   async init() {
     this.discordClient.on("ready", () => {
       console.log(`Discord Bot logged in as ${this.discordClient.user?.tag}!`);
-      this.discordClient.channels.fetch(CHANNEL_ID).then((ch) => {
+      this.discordClient.channels
+        .fetch(CHANNEL_ID)
+        .then((ch) => {
           console.log("Successfully fetched the channel");
-          if(ch) {
+          if (ch) {
             this.channel = ch as VoiceChannel;
-              this.channelFetchState = "success";
+            this.channelFetchState = "success";
           } else {
-              this.channel = null;
-              this.channelFetchState = "error";
+            this.channel = null;
+            this.channelFetchState = "error";
           }
-      }).catch((_) => {
+        })
+        .catch((_) => {
           this.channel = null;
           this.channelFetchState = "error";
-      });
+        });
     });
     await this.discordClient.login(DISCORD_TOKEN!);
   }
 
   async getChannel(): Promise<VoiceChannel | null> {
-    if(this.channelFetchState === 'success') {
-        return this.channel;
-    } else if (this.channelFetchState === 'inProgress') {
-        return null;
+    if (this.channelFetchState === "success") {
+      return this.channel;
+    } else if (this.channelFetchState === "inProgress") {
+      return null;
     } else {
-        try {
-            return await this.discordClient.channels.fetch("CHANNEL_ID") as VoiceChannel;
-        } catch (e: any) {
-            console.error(e);
-            return null;
-        }
+      try {
+        return (await this.discordClient.channels.fetch(
+          "CHANNEL_ID"
+        )) as VoiceChannel;
+      } catch (e: any) {
+        console.error(e);
+        return null;
+      }
     }
   }
 

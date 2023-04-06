@@ -1,1 +1,1 @@
-export const NUMBER_EMOJI = [ '' ]
+export const NUMBER_EMOJI = [""];
