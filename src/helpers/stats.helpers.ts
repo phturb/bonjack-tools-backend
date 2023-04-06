@@ -2,40 +2,31 @@ import { PrismaClient } from "@prisma/client";
 
 export const getPlayerStats = async (id: string, prisma: PrismaClient) => {
     const playerGames = await prisma.game.findMany({
-        where : {OR : [{
-                player1Id : {
-                    equals: id
+        where: {
+            playerRoles: {
+                some: {
+                    playerId: id
                 }
-            },
-            {
-                player2Id : {
-                    equals: id
-                }
-            },
-            {
-                player3Id : {
-                    equals: id
-                }
-            },
-            {
-                player4Id : {
-                    equals: id
-                }
-            },
-            {
-                player5Id : {
-                    equals: id
-                }
-            }],
+            }
         },
         include: {
-            roll: true
+            rolls: {
+                include: {             
+                    playerRoles: {
+                        include: {
+                            player: true
+                        }
+                    }
+                }
+            }
+
         }
     });
-    const gamesLength = playerGames.map((x: { roll: string | any[]; }) => x.roll.length);
-    return { numberOfGame: gamesLength.length,
-             totalRoll: gamesLength.reduce((x: number, y: number) => x + y, 0)
-            };
+    const gamesLength = playerGames.map((x: any) => x.rolls.length);
+    return { 
+        numberOfGame: gamesLength.length,
+        totalRoll: gamesLength.reduce((x: number, y: number) => x + y, 0)
+    };
 };
 
 export const getAllPlayerStats = async (prisma: PrismaClient) => {
@@ -43,4 +34,5 @@ export const getAllPlayerStats = async (prisma: PrismaClient) => {
     return players.map( async (player: { id: string; }) => {
         return { ...player, stats : await getPlayerStats(player.id, prisma)};
     });
-}
+};
+

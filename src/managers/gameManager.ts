@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Game, Player, PlayerRole, PrismaClient, Roll } from "@prisma/client";
 import {
   CacheType,
   Interaction,
@@ -68,18 +68,78 @@ class GameManager implements Closeable, ControllerConfigurator, Initializable {
   configureController(app: Application): Application {
     app.get("/players", async (req: Request, res: Response) => {
         const players = await this.prisma.player.findMany();
-        res.json(players);
+        const updatedPlayers = players.map((x: Player) => {
+          return { id: x.id, name: x.name };
+        });
+        res.json(updatedPlayers);
     });
     
     app.get("/games", async (req: Request, res: Response) => {
         const games = await this.prisma.game.findMany();
-        res.json(games);
+        const playerRoles = await this.prisma.playerRole.findMany();
+        const updatedGames = games.map((x: Game) => {
+          const filteredPlayerRolls = playerRoles.filter((y: PlayerRole) => {
+            return x.id === y.gameId;
+          });
+          const noDupplicatePlayerRolls = filteredPlayerRolls.filter((y: PlayerRole) => {
+            return y.rollNumber == filteredPlayerRolls[0].rollNumber;
+          });
+          return { 
+            id: x.id,
+            player1Id: noDupplicatePlayerRolls.length >= 1 ? noDupplicatePlayerRolls[0].roleName : undefined,
+            player2Id: noDupplicatePlayerRolls.length >= 2 ? noDupplicatePlayerRolls[1].roleName : undefined,
+            player3Id: noDupplicatePlayerRolls.length >= 3 ? noDupplicatePlayerRolls[2].roleName : undefined,
+            player4Id: noDupplicatePlayerRolls.length >= 4 ? noDupplicatePlayerRolls[3].roleName : undefined,
+            player5Id: noDupplicatePlayerRolls.length >= 5 ? noDupplicatePlayerRolls[4].roleName : undefined,
+          };
+        });
+        res.json(updatedGames);
     });
     
     
     app.get("/rolls", async (req: Request, res: Response) => {
         const rolls = await this.prisma.roll.findMany();
+        const playerRoles = await this.prisma.playerRole.findMany();
+        const updatedRolls = rolls.map((x: Roll) => {
+          const filteredPlayerRolls = playerRoles.filter((y: PlayerRole) => {
+            return x.gameId === y.gameId && x.rollNumber === y.rollNumber;
+          });
+          return { 
+            gameId: x.gameId,
+            rollNumber: x.rollNumber,
+            player1Roll: filteredPlayerRolls.length >= 1 ? filteredPlayerRolls[0].roleName : undefined,
+            player2Roll: filteredPlayerRolls.length >= 2 ? filteredPlayerRolls[1].roleName : undefined,
+            player3Roll: filteredPlayerRolls.length >= 3 ? filteredPlayerRolls[2].roleName : undefined,
+            player4Roll: filteredPlayerRolls.length >= 4 ? filteredPlayerRolls[3].roleName : undefined,
+            player5Roll: filteredPlayerRolls.length >= 5 ? filteredPlayerRolls[4].roleName : undefined,
+          };
+        });
+        res.json(updatedRolls);
+    });
+
+    app.get("/v2/players", async (req: Request, res: Response) => {
+        const players = await this.prisma.player.findMany();
+        res.json(players);
+    });
+    
+    app.get("/v2/games", async (req: Request, res: Response) => {
+        const games = await this.prisma.game.findMany();
+        res.json(games);
+    });
+     
+    app.get("/v2/rolls", async (req: Request, res: Response) => {
+        const rolls = await this.prisma.roll.findMany();
         res.json(rolls);
+    });
+
+    app.get("/v2/roles", async (req: Request, res: Response) => {
+        const roles = await this.prisma.role.findMany();
+        res.json(roles);
+    });
+
+    app.get("/v2/playerRoles", async (req: Request, res: Response) => {
+        const playerRoles = await this.prisma.playerRole.findMany();
+        res.json(playerRoles);
     });
 
     return app;
@@ -361,35 +421,7 @@ class GameManager implements Closeable, ControllerConfigurator, Initializable {
     this.gameState.nextRollTimer = TIMER_TIME;
     if (!this.gameState.gameInProgress) {
       this.gameState.gameInProgress = true;
-      const currentGame = await this.prisma.game.create({
-        data: {
-          player_game_player1IdToplayer: this.gameState.players[0].player.id
-            ? {
-                connect: { id: this.gameState.players[0].player.id },
-              }
-            : undefined,
-          player_game_player2IdToplayer: this.gameState.players[1].player.id
-            ? {
-                connect: { id: this.gameState.players[1].player.id },
-              }
-            : undefined,
-          player_game_player3IdToplayer: this.gameState.players[2].player.id
-            ? {
-                connect: { id: this.gameState.players[2].player.id },
-              }
-            : undefined,
-          player_game_player4IdToplayer: this.gameState.players[3].player.id
-            ? {
-                connect: { id: this.gameState.players[3].player.id },
-              }
-            : undefined,
-          player_game_player5IdToplayer: this.gameState.players[4].player.id
-            ? {
-                connect: { id: this.gameState.players[4].player.id },
-              }
-            : undefined,
-        },
-      });
+      const currentGame = await this.prisma.game.create({ data: {}});
       this.gameState.gameId = currentGame.id;
       console.log("Law has started!");
     }
@@ -399,16 +431,26 @@ class GameManager implements Closeable, ControllerConfigurator, Initializable {
     for (let i = 0; i < this.gameState.players.length; i++) {
       this.gameState.players[i].role = this.roles[i];
     }
+    const playerRolesToCreate = 
+      this.gameState.players.filter(x => { return x.player.id && x.role; })
+                            .map(x => {
+                              return {
+                                playerId: x.player.id,
+                                roleName: x.role as string
+                              };
+                            });
+
     await this.prisma.roll.create({
       data: {
         gameId: this.gameState.gameId,
         rollNumber: this.gameState.rollCount,
-        player1Roll: this.gameState.players[0].role ?? null,
-        player2Roll: this.gameState.players[1].role ?? null,
-        player3Roll: this.gameState.players[2].role ?? null,
-        player4Roll: this.gameState.players[3].role ?? null,
-        player5Roll: this.gameState.players[4].role ?? null,
+        playerRoles: {
+          create: playerRolesToCreate 
+        }
       },
+      include: {
+        playerRoles: true,
+      }
     });
 
     this.countDownId = setInterval(async () => {
